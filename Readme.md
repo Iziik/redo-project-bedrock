@@ -1,174 +1,150 @@
-Got it ✅ — here’s a **ready-to-use `README.md` file** for your repo since you deployed with **eksctl**:
+#### End-to-End Deployment of a Retail Application on AWS EKS with ALB Integration
+
+## Introduction
+This report documents the complete process of deploying a containerized retail application to **Amazon Elastic Kubernetes Service (EKS)** using **Terraform for Infrastructure as Code (IaC)** and integrating it with the **AWS Application Load Balancer (ALB) Ingress Controller** for secure external access.  
+
+The project showcases the following:
+- Infrastructure provisioning with Terraform  
+- EKS cluster setup and application deployment  
+- Ingress routing with ALB and ACM-managed SSL certificates  
+- CI/CD automation for Terraform using GitHub Actions  
+- DNS integration with Namecheap for custom domain routing  
 
 ---
 
-````markdown
-# Project Bedrock – Retail Store App on AWS EKS
+## 1. Infrastructure Provisioning with Terraform
+Infrastructure was provisioned using **Terraform**, following a resource-based file structure instead of modules. Each AWS resource was defined in a dedicated file for clarity and maintainability:  
 
-This repository contains IaC scripts and Kubernetes manifests for deploying the **Retail Store Sample Application** (codenamed **Project Bedrock**) onto **Amazon Elastic Kubernetes Service (EKS)** using `eksctl`.
+- **`vpc.tf`** → Defines the VPC and its CIDR block  
+- **`subnets.tf`** → Creates public and private subnets across availability zones  
+- **`igw.tf`** → Configures Internet Gateway for public subnet access  
+- **`routes.tf`** → Sets up route tables and associations for traffic flow  
+- **`eks.tf`** → Provisions the EKS cluster and worker node groups  
+- **`providers.tf`** → Declares AWS provider configuration  
+- **`locals.tf`** → Defines reusable variables and naming conventions  
 
----
-
-## 🚀 Features
-- EKS Cluster provisioning with `eksctl`
-- NodeGroup creation (scalable worker nodes)
-- AWS Load Balancer Controller for ingress management
-- Route 53 + ACM integration for custom domain & HTTPS
-- Microservices deployed:
-  - UI
-  - Orders
-  - Carts
-  - Inventory
+Additionally, a **remote backend** was configured to store the Terraform state file securely. This ensured collaboration, state consistency, and disaster recovery capabilities.  
 
 ---
 
-## 📦 Prerequisites
+## 2. EKS Cluster Setup
+The **Amazon EKS cluster** was created using the `eks.tf` definition. Key configurations included:  
+- Worker node groups with auto-scaling  
+- IAM roles and policies for EKS and worker nodes  
+- Security groups for Kubernetes communication  
 
-Ensure the following tools are installed and configured:
-
-- [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) (configured with `aws configure`)
-- [eksctl](https://eksctl.io/)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Helm](https://helm.sh/)
-- A registered domain name in Route 53 (for HTTPS)
-
----
-
-## ⚙️ Deployment Steps
-
-### 1. Clone Repository
+Once provisioned, the cluster configuration was updated locally with:  
 ```bash
-git clone https://github.com/<your-repo>/project-bedrock.git
-cd project-bedrock
-````
+aws eks update-kubeconfig --name <cluster-name> --region <region>
+```
 
-### 2. Create EKS Cluster with `eksctl`
+---
 
-```bash
-eksctl create cluster \
-  --name bedrock-cluster \
+## 3. Application Deployment
+The retail application (frontend `ui` and backend `api`) was containerized and deployed to the EKS cluster.  
+
+### Kubernetes Manifests:
+- **Namespace**: `retail-dev`  
+- **Deployments**: Separate deployments for `ui` and `api` services  
+- **Services**: Exposed via ClusterIP for internal communication  
+
+---
+
+## 4. Ingress and ALB Integration
+The **AWS Load Balancer Controller** was installed to manage ingress traffic. The Ingress resource was annotated to:  
+- Use an **internet-facing ALB**  
+- Configure listeners on **HTTP (80)** and **HTTPS (443)**  
+- Attach an **ACM-issued SSL certificate**  
+- Define health check paths (`/health`)  
+
+Example Ingress YAML snippet:
+```yaml
+annotations:
+  kubernetes.io/ingress.class: alb
+  alb.ingress.kubernetes.io/scheme: internet-facing
+  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+  alb.ingress.kubernetes.io/target-type: ip
+  alb.ingress.kubernetes.io/certificate-arn: <certificate-arn>
+```
+
+---
+
+## 5. SSL Certificate with ACM
+A certificate for `store.mijanscript.xyz` was provisioned in **AWS Certificate Manager (ACM)**. Validation was completed via **CNAME DNS records** in Namecheap.  
+
+Once validated, the certificate was attached to the ALB via Ingress annotations, enabling secure HTTPS access.  
+
+---
+
+## 6. DNS Configuration with Namecheap
+Instead of Route 53, **Namecheap** was used for DNS management.  
+- An **A record** was created for `store.mijanscript.xyz` pointing to the ALB’s DNS name.  
+- DNS propagation ensured that both HTTP and HTTPS routes became accessible.  
+
+---
+
+## 7. CI/CD Pipeline for Terraform
+A **GitHub Actions pipeline** was configured to automate Terraform operations. The workflow:  
+1. On **push to a feature branch**:  
+   - Runs `terraform fmt` to enforce code formatting  
+   - Runs `terraform validate` to check syntax and indentation  
+   - Executes `terraform plan` to detect changes  
+2. On **merge to main**:  
+   - Executes `terraform apply` to provision/update infrastructure  
+
+This ensured safe, automated infrastructure deployments while maintaining high-quality Terraform code practices.  
+
+---
+
+## 8. Troubleshooting & Fixes
+Several challenges were encountered and resolved:  
+- **Ingress returning 404** → Fixed by ensuring correct service mapping and ALB reconciliation  
+- **DNS not resolving** → Resolved by verifying Namecheap A records and propagation  
+- **HTTPS not working** → Confirmed ALB Security Group allowed inbound traffic on port 443  
+
+---
+
+## Conclusion
+This project successfully demonstrated the deployment of a retail application on AWS EKS using Terraform and GitHub Actions. Key achievements include:  
+- Infrastructure as Code with Terraform using a file-per-resource approach  
+- Secure, scalable application hosting on EKS  
+- Automated CI/CD pipeline for infrastructure with GitHub Actions  
+- Integration of Namecheap DNS with AWS ALB and ACM for SSL termination
+
+### USER -ACCESS
+- I provisioned an IAM user in AWS and integrated it with the Kubernetes cluster through RBAC (Role-Based Access Control). Using this setup, I bound the user’s AWS identity to a Kubernetes role, assigning permissions that allow the user to read, list, and describe cluster resources. This ensures secure, fine-grained access control while maintaining limited privilege.
+
+#### User-Instructions
+- 
+- When you are in the aws console, you can create access to use in aws cli
+-  On the user’s machine (or wherever they’ll use kubectl)
+-  run "aws configure --profile dev-readonly and enter user access key and secret you created. region is eu-west-2
+-  Set output format in json and this will store your credentials in ~/.aws/credentials
+-  
+##### Update Kubeconfig for your user
+```
+aws eks update-kubeconfig \
   --region eu-west-2 \
-  --nodegroup-name bedrock-nodes \
-  --node-type t3.medium \
-  --nodes 2 \
-  --nodes-min 2 \
-  --nodes-max 4 \
-  --managed
+  --name your-cluster-name \
+  --profile dev-readonly \
+  --alias dev-readonly
 ```
+  
+- --profile dev-readonly tells AWS CLI to use the new IAM user.
+- --alias adds a context name so you can easily switch in kubectl
 
-### 3. Enable IAM OIDC Provider
-
-```bash
-eksctl utils associate-iam-oidc-provider \
-  --cluster bedrock-cluster \
-  --approve
-```
-
-### 4. Deploy AWS Load Balancer Controller
-
-```bash
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
-
-kubectl apply -k github.com/aws/eks-charts/stable/aws-load-balancer-controller//crds?ref=master
-
-eksctl create iamserviceaccount \
-  --cluster bedrock-cluster \
-  --namespace kube-system \
-  --name aws-load-balancer-controller \
-  --role-name AWSLoadBalancerControllerRole \
-  --attach-policy-arn arn:aws:iam::<YOUR_ACCOUNT_ID>:policy/AWSLoadBalancerControllerIAMPolicy \
-  --approve
-
-helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
-  -n kube-system \
-  --set clusterName=bedrock-cluster \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=aws-load-balancer-controller
-```
-
-### 5. Deploy Application
-
-```bash
-kubectl apply -f k8s/
-```
-
-This deploys:
-
-* Deployments (`orders`, `carts`, `inventory`, `ui`)
-* Services (`ClusterIP` / `NodePort`)
-* Ingress (via ALB)
-
-### 6. Configure Route 53
-
-1. Go to **Route 53 Console → Hosted Zones → YourDomain.com**
-2. Create an **A Record (Alias)** pointing to your ALB DNS.
-3. Use **AWS Certificate Manager (ACM)** to request a TLS certificate.
-4. Attach certificate to ALB for HTTPS.
+  ##### Test Permissions
+  ```
+  kubectl get pods
+  kubectl get pods --namespace retail-dev  #Add namespace as most of the services and deployments were deployed in retail-dev namespace
+  ```
+This deployment approach is production-ready and can be extended for scaling, monitoring, and further automation.  
 
 ---
 
-## 🧪 Verification
 
-Check resources:
 
-```bash
-kubectl get pods -A
-kubectl get svc -A
-kubectl get ingress -A
-```
 
-Test connectivity:
 
-```bash
-curl http://<ALB-DNS>
-```
 
-Check domain resolution:
 
-```bash
-dig yourdomain.com
-nslookup yourdomain.com
-```
-
-Open the browser at:
-
-```
-https://yourdomain.com
-```
-
----
-
-## 👥 Developer Access (Read-Only)
-
-Create IAM user with limited access:
-
-```bash
-aws iam create-user --user-name dev-readonly
-aws iam attach-user-policy \
-  --user-name dev-readonly \
-  --policy-arn arn:aws:iam::aws:policy/AmazonEKSReadOnlyAccess
-```
-
-Provide credentials with:
-
-```bash
-aws iam create-access-key --user-name dev-readonly
-```
-
-Developers can then run:
-
-```bash
-aws eks update-kubeconfig --name bedrock-cluster --region eu-west-2
-kubectl get pods -A
-```
-
----
-
-## 📖 Notes
-
-* Default databases (MySQL, PostgreSQL, Redis, RabbitMQ) run **inside the cluster** for this phase.
-
----
-
-✅ Your cluster and app should now be up and accessible!
