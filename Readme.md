@@ -1,4 +1,4 @@
-#### End-to-End Deployment of a Retail Application on AWS EKS with ALB Integration
+# End-to-End Deployment of a Retail Application on AWS EKS with ALB Integration
 
 ## Introduction
 This report documents the complete process of deploying a containerized retail application to **Amazon Elastic Kubernetes Service (EKS)** using **Terraform for Infrastructure as Code (IaC)** and integrating it with the **AWS Application Load Balancer (ALB) Ingress Controller** for secure external access.  
